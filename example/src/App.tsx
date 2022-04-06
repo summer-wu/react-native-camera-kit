@@ -1,60 +1,81 @@
-import React, { Component } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
+  ViewStyle,
+  useWindowDimensions,
+  SafeAreaView,
+  ScrollView,
 } from 'react-native';
 
 import CameraScreenExample from './CameraScreenExample';
 import BarcodeScreenExample from './BarcodeScreenExample';
 import CameraExample from './CameraExample';
 
-type State = {
-  example?: CameraExample | CameraScreenExample | BarcodeScreenExample;
+const isOrientationPortrait = ({ width, height }) => height >= width;
+
+interface ISVWrapperProps {
+  children: any;
+  goHome: () => void;
+}
+function SimpleContainer(props: ISVWrapperProps) {
+  const viewStyle1: ViewStyle = { flexDirection: 'row', backgroundColor: '#ccc' };
+  const { height, width } = useWindowDimensions();
+  const isPortrait = isOrientationPortrait({ height, width });
+  const orientationStr = isPortrait ? 'portrait' : 'landscape';
+  const tipText = `width:${width},height:${height},orientation:${orientationStr}`;
+  const viewStyle2: ViewStyle = { flex: 1, borderWidth: 1, borderColor: 'red' };
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <View style={viewStyle1}>
+          <TouchableOpacity onPress={props.goHome} style={{ marginRight: 20 } as any}>
+            <Text style={{ color: 'blue' }}>Go Home</Text>
+          </TouchableOpacity>
+          <Text>{tipText}</Text>
+        </View>
+        <View style={viewStyle2}>{props.children}</View>
+      </View>
+    </SafeAreaView>
+  );
 }
 
-export default class App extends Component {
-  state: State;
-
-  constructor(props) {
-    super(props);
-    this.state = {
-      example: undefined,
-    };
-  }
-
-  render() {
-    if (this.state.example) {
-      const Example = this.state.example;
-      return <Example />;
-    }
+interface IState {
+  example?: Function;
+}
+export default function App(props: any) {
+  const [state, setState] = useState<IState>({ example: null });
+  const goHome = () => setState({ example: null });
+  if (state.example) {
+    const Example: any = state.example;
     return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.headerContainer}>
-          <Text style={{ fontSize: 60 }}>🎈</Text>
-          <Text style={styles.headerText}>
-            React Native Camera Kit
-          </Text>
-        </View>
-        <View style={styles.container}>
-          <TouchableOpacity style={styles.button} onPress={() => this.setState({ example: CameraExample })}>
-            <Text style={styles.buttonText}>
-              Camera
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => this.setState({ example: CameraScreenExample })}>
-            <Text style={styles.buttonText}>
-              Camera Screen
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => this.setState({ example: BarcodeScreenExample })}>
-            <Text style={styles.buttonText}>
-              Barcode Scanner
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <SimpleContainer goHome={goHome}>
+        <Example />
+      </SimpleContainer>
+    );
+  } else {
+    return (
+      <SimpleContainer goHome={goHome}>
+        <ScrollView style={{ flex: 1 }}>
+          <View style={styles.headerContainer}>
+            <Text style={{ fontSize: 60 }}>🎈</Text>
+            <Text style={styles.headerText}>React Native Camera Kit</Text>
+          </View>
+          <View style={styles.container}>
+            <TouchableOpacity style={styles.button} onPress={() => setState({ example: CameraExample })}>
+              <Text style={styles.buttonText}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={() => setState({ example: CameraScreenExample })}>
+              <Text style={styles.buttonText}>Camera Screen</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={() => setState({ example: BarcodeScreenExample })}>
+              <Text style={styles.buttonText}>Barcode Scanner</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SimpleContainer>
     );
   }
 }
@@ -63,7 +84,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 30,
-    alignItems: 'center',
     backgroundColor: '#F5FCFF',
     marginHorizontal: 24,
   },
@@ -83,7 +103,6 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginVertical: 12,
-    width: '100%',
     backgroundColor: '#dddddd',
     justifyContent: 'center',
   },

@@ -13,6 +13,172 @@
 #import "CKCameraOverlayView.h"
 #import "CKMockPreview.h"
 
+NSString * NSStringFromInterfaceOrientation(UIInterfaceOrientation o){
+    if (o==UIInterfaceOrientationPortrait) {
+        return @"Portrait";
+    } else if (o==UIInterfaceOrientationLandscapeLeft){
+        return @"LandscapeLeft";
+    } else if (o==UIInterfaceOrientationLandscapeRight){
+        return @"LandscapeRight";
+    } else if (o==UIInterfaceOrientationPortraitUpsideDown){
+        return @"PortraitUpsideDown";
+    } else {
+        @throw @"unknown interface orientation";
+    }
+}
+
+AVCaptureVideoOrientation AVCaptureVideoOrientationFromInterfaceOrientation(UIInterfaceOrientation o){
+    if (o == UIInterfaceOrientationPortrait) {
+        return AVCaptureVideoOrientationPortrait;
+    } else if (o == UIInterfaceOrientationLandscapeLeft){
+        return AVCaptureVideoOrientationLandscapeLeft;
+    } else if (o == UIInterfaceOrientationLandscapeRight){
+        return AVCaptureVideoOrientationLandscapeRight;
+    } else if (o == UIInterfaceOrientationPortraitUpsideDown){
+        return AVCaptureVideoOrientationPortraitUpsideDown;
+    } else {
+        @throw @"unknown interface orientation";
+    }
+}
+
+@interface CKScannerOverlay: UIView
+@property (nonatomic,strong) UIView *topView, *leftSideView,*rightSideView,*bottomView;
+@property (nonatomic,strong) NSArray *cornerViews;
+@property (nonatomic,strong) UIView * dataReadingFrame;
+@property (nonatomic) CGFloat frameOffset;
+@property (nonatomic) CGFloat frameHeight;
+@property (nonatomic) UIView *scannerView;
+@property (nonatomic, strong) UIColor *laserColor;
+@property (nonatomic, strong) UIColor *frameColor;
+@property (nonatomic, assign) BOOL shouldAnimating;
+@end
+
+@implementation CKScannerOverlay
+- (instancetype)initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.frameOffset = 30;
+        self.frameHeight = 200;
+
+        self.dataReadingFrame = [UIView new];
+        [self addSubview:self.dataReadingFrame];
+
+        self.cornerViews = @[[UIView new],[UIView new],[UIView new],[UIView new],[UIView new],[UIView new],[UIView new],[UIView new]];
+        for (UIView *v in self.cornerViews) {
+            [self.dataReadingFrame addSubview:v];
+        }
+
+        self.topView = [UIView new];
+        self.leftSideView = [UIView new];
+        self.rightSideView = [UIView new];
+        self.bottomView = [UIView new];
+        [self addSubview:self.topView];
+        [self addSubview:self.leftSideView];
+        [self addSubview:self.rightSideView];
+        [self addSubview:self.bottomView];
+
+    }
+    return self;
+}
+
+- (void)layoutSubviews{
+    self.frame = self.superview.bounds;
+    [self layoutDataReadingFrame];
+    [self layoutCornerViews];
+    [self layoutDimmedViews];
+    if (self.shouldAnimating) {
+        [self createScannerViewAndAnimate];
+    } else {
+        [self.scannerView removeFromSuperview];
+        self.scannerView = nil;
+    }
+}
+
+- (void)layoutDataReadingFrame {
+    CGFloat frameWidth = self.bounds.size.width - 2 * self.frameOffset;
+    self.dataReadingFrame.frame = CGRectMake(0, 0, frameWidth, self.frameHeight);
+    self.dataReadingFrame.center = self.center;
+    self.dataReadingFrame.backgroundColor = [UIColor clearColor];
+}
+
+- (void)createScannerViewAndAnimate {
+    if (self.scannerView) {
+        [self.scannerView removeFromSuperview];
+    }
+    self.scannerView = [[UIView alloc] initWithFrame:CGRectMake(2, 0, self.dataReadingFrame.frame.size.width - 4, 2)];
+    self.scannerView.backgroundColor = self.laserColor;
+
+    if (self.scannerView.frame.origin.y != 0) {
+        [self.scannerView setFrame:CGRectMake(2, 0, self.dataReadingFrame.frame.size.width - 4, 2)];
+    }
+    [self.dataReadingFrame addSubview:self.scannerView];
+    [UIView animateWithDuration:3 delay:0 options:(UIViewAnimationOptionAutoreverse | UIViewAnimationOptionRepeat) animations:^{
+        CGFloat middleX = self.dataReadingFrame.frame.size.width / 2;
+        self.scannerView.center = CGPointMake(middleX, self.dataReadingFrame.frame.size.height - 1);
+    } completion:^(BOOL finished) {}];
+}
+
+
+// dimmed views are rectangles placed on the top left right bottom
+- (void)layoutDimmedViews {
+    UIColor *bgColor = [UIColor colorWithRed:0.0/255.0 green:0.0/255.0 blue:0.0/255.0 alpha:0.4];
+    self.topView.backgroundColor = self.leftSideView.backgroundColor = self.rightSideView.backgroundColor = self.bottomView.backgroundColor = bgColor;
+
+    CGRect inputRect = self.dataReadingFrame.frame;
+    self.topView.frame = CGRectMake(0, 0, self.frame.size.width, inputRect.origin.y);
+    self.leftSideView.frame = CGRectMake(0, inputRect.origin.y, self.frameOffset, self.frameHeight);
+    self.rightSideView.frame = CGRectMake(inputRect.size.width + self.frameOffset, inputRect.origin.y, self.frameOffset, self.frameHeight);
+    self.bottomView.frame = CGRectMake(0, inputRect.origin.y + self.frameHeight, self.frame.size.width, self.frame.size.height - inputRect.origin.y - self.frameHeight);
+}
+
+
+- (void)layoutCornerViews {
+    UIView *frameView = self.dataReadingFrame;
+    CGFloat cornerSize = 20.f;
+    CGFloat cornerWidth = 2.f;
+    for (int i = 0; i < 8; i++) {
+        CGFloat x = 0.0;
+        CGFloat y = 0.0;
+        CGFloat width = 0.0;
+        CGFloat height = 0.0;
+        switch (i) {
+            case 0:
+                x = 0; y = 0; width = cornerWidth; height = cornerSize;
+                break;
+            case 1:
+                x = 0; y = 0; width = cornerSize; height = cornerWidth;
+                break;
+            case 2:
+                x = CGRectGetWidth(frameView.bounds) - cornerSize; y = 0; width = cornerSize; height = cornerWidth;
+                break;
+            case 3:
+                x = CGRectGetWidth(frameView.bounds) - cornerWidth; y = 0; width = cornerWidth; height = cornerSize;
+                break;
+            case 4:
+                x = CGRectGetWidth(frameView.bounds) - cornerWidth;
+                y = CGRectGetHeight(frameView.bounds) - cornerSize; width = cornerWidth; height = cornerSize;
+                break;
+            case 5:
+                x = CGRectGetWidth(frameView.bounds) - cornerSize;
+                y = CGRectGetHeight(frameView.bounds) - cornerWidth; width = cornerSize; height = cornerWidth;
+                break;
+            case 6:
+                x = 0; y = CGRectGetHeight(frameView.bounds) - cornerWidth; width = cornerSize; height = cornerWidth;
+                break;
+            case 7:
+                x = 0; y = CGRectGetHeight(frameView.bounds) - cornerSize; width = cornerWidth; height = cornerSize;
+                break;
+        }
+        UIView * cornerView = self.cornerViews[i];
+        cornerView.frame = CGRectMake(x, y, width, height);
+        cornerView.backgroundColor = self.frameColor;
+    }
+}
+
+
+@end
+
 static void * CapturingStillImageContext = &CapturingStillImageContext;
 static void * SessionRunningContext = &SessionRunningContext;
 
@@ -100,13 +266,12 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 
 // scanner options
 @property (nonatomic) BOOL showFrame;
-@property (nonatomic) UIView *scannerView;
-@property (nonatomic, strong) RCTDirectEventBlock onReadCode;
-@property (nonatomic) CGFloat frameOffset;
-@property (nonatomic) CGFloat frameHeight;
+@property (nonatomic,strong) CKScannerOverlay *scannerOverlay;
 @property (nonatomic, strong) UIColor *laserColor;
 @property (nonatomic, strong) UIColor *frameColor;
-@property (nonatomic) UIView * dataReadingFrame;
+@property (nonatomic, strong) RCTDirectEventBlock onReadCode;
+
+
 
 // camera options
 @property (nonatomic) AVCaptureDevicePosition cameraType;
@@ -129,6 +294,7 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 - (void)dealloc
 {
     [self removeObservers];
+    [[UIDevice currentDevice] endGeneratingDeviceOrientationNotifications];
 }
 
 -(PHFetchOptions *)fetchOptions {
@@ -188,17 +354,14 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 #if !(TARGET_IPHONE_SIMULATOR)
         [self setupCaptureSession];
 #endif
-        self.previewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
-        [self.layer addSublayer:self.previewLayer];
-        self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-        
+
 #if (TARGET_IPHONE_SIMULATOR)
         // Create mock camera layer. When a photo is taken, we capture this layer and save it in place of a
         // hardware input.
         self.mockPreview = [[CKMockPreview alloc] initWithFrame:CGRectZero];
         [self addSubview:self.mockPreview];
 #endif
-        
+
         UIView *focusView = [[UIView alloc] initWithFrame:CGRectZero];
         focusView.backgroundColor = [UIColor clearColor];
         focusView.layer.borderColor = [UIColor yellowColor].CGColor;
@@ -212,11 +375,10 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
         self.zoomMode = CKCameraZoomModeOn;
         self.flashMode = CKCameraFlashModeAuto;
         self.focusMode = CKCameraFocusModeOn;
-        
+
         self.frameColor = [UIColor whiteColor];
         self.laserColor = [UIColor redColor];
-        self.frameOffset = 30;
-        self.frameHeight = 200;
+
     }
 
     return self;
@@ -301,11 +463,17 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
     if (color != nil) {
         _laserColor = color;
     }
+    if (self.scannerOverlay) {
+        self.scannerOverlay.laserColor = color;
+    }
 }
 
 - (void)setFrameColor:(UIColor *)color {
     if (color != nil) {
         _frameColor = color;
+    }
+    if (self.scannerOverlay) {
+        self.scannerOverlay.frameColor = color;
     }
 }
 
@@ -319,7 +487,7 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
     // LANDSCAPE_LEFT: 1, // ⬅️
     // PORTRAIT_UPSIDE_DOWN: 2, // ⬇️
     // LANDSCAPE_RIGHT: 3, // ➡️
-    
+
     UIDevice * device = notification.object;
     UIDeviceOrientation orientation = device.orientation;
     if (orientation == UIDeviceOrientationPortrait) {
@@ -393,8 +561,18 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
         }
 
         [self.session commitConfiguration];
-
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setupPreviewLayer];
+        });
     } );
+}
+
+- (void)setupPreviewLayer{
+    self.previewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
+    [self.layer addSublayer:self.previewLayer];
+    self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    UIInterfaceOrientation initialInterfaceOrientation = [UIApplication sharedApplication].statusBarOrientation;
+    self.previewLayer.connection.videoOrientation = AVCaptureVideoOrientationFromInterfaceOrientation(initialInterfaceOrientation);
 }
 
 -(void)handleCameraPermission {
@@ -432,7 +610,7 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 
 -(void)reactSetFrame:(CGRect)frame {
     [super reactSetFrame:frame];
-    
+
     self.previewLayer.frame = self.bounds;
 
 #if TARGET_IPHONE_SIMULATOR
@@ -526,12 +704,12 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 
 
 - (void)snapStillImage:(NSDictionary*)options success:(CaptureBlock)onSuccess onError:(void (^)(NSString*))onError {
-    
+
     #if TARGET_IPHONE_SIMULATOR
     [self capturePreviewLayer:options success:onSuccess onError:onError];
     return;
     #endif
-    
+
     dispatch_async( self.sessionQueue, ^{
         AVCaptureConnection *connection = [self.stillImageOutput connectionWithMediaType:AVMediaTypeVideo];
 
@@ -566,7 +744,7 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 
             // The sample buffer is not retained. Create image data before saving the still image to the photo library asynchronously.
             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-            
+
             [self writeCapturedImageData:imageData onSuccess:onSuccess onError:onError];
             [self resetFocus];
         }];
@@ -865,122 +1043,46 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 
 #pragma mark - Frame for Scanner Settings
 
-- (void)didMoveToWindow {
-    [super didMoveToWindow];
-    if (self.sessionRunning && self.dataReadingFrame) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self startAnimatingScanner:self.dataReadingFrame];
-        });
+
+- (void)addFrameForScanner{
+    if (!self.scannerOverlay) {
+        self.scannerOverlay = [CKScannerOverlay new];
+        self.scannerOverlay.frameColor = self.frameColor;
+        self.scannerOverlay.laserColor = self.laserColor;
+        [self addSubview:self.scannerOverlay];
+        [self.scannerOverlay setShouldAnimating:YES];
     }
 }
 
-- (void)addFrameForScanner {
-    CGFloat frameWidth = self.bounds.size.width - 2 * self.frameOffset;
-    if (!self.dataReadingFrame) {
-        self.dataReadingFrame = [[UIView alloc] initWithFrame:CGRectMake(0, 0, frameWidth, self.frameHeight)]; //
-        self.dataReadingFrame.center = self.center;
-        self.dataReadingFrame.backgroundColor = [UIColor clearColor];
-        [self createCustomFramesForView:self.dataReadingFrame];
-        [self addSubview:self.dataReadingFrame];
 
-        [self startAnimatingScanner:self.dataReadingFrame];
-
-        [self addVisualEffects:self.dataReadingFrame.frame];
-
-        CGRect visibleRect = [self.previewLayer metadataOutputRectOfInterestForRect:self.dataReadingFrame.frame];
-        self.metadataOutput.rectOfInterest = visibleRect;
+- (void)layoutSubviews{
+    [super layoutSubviews];
+    if (self.scannerOverlay) {
+        [self.scannerOverlay layoutSubviews];
     }
-}
-
-- (void)createCustomFramesForView:(UIView *)frameView {
-    CGFloat cornerSize = 20.f;
-    CGFloat cornerWidth = 2.f;
-    for (int i = 0; i < 8; i++) {
-        CGFloat x = 0.0;
-        CGFloat y = 0.0;
-        CGFloat width = 0.0;
-        CGFloat height = 0.0;
-        switch (i) {
-            case 0:
-                x = 0; y = 0; width = cornerWidth; height = cornerSize;
-                break;
-            case 1:
-                x = 0; y = 0; width = cornerSize; height = cornerWidth;
-                break;
-            case 2:
-                x = CGRectGetWidth(frameView.bounds) - cornerSize; y = 0; width = cornerSize; height = cornerWidth;
-                break;
-            case 3:
-                x = CGRectGetWidth(frameView.bounds) - cornerWidth; y = 0; width = cornerWidth; height = cornerSize;
-                break;
-            case 4:
-                x = CGRectGetWidth(frameView.bounds) - cornerWidth;
-                y = CGRectGetHeight(frameView.bounds) - cornerSize; width = cornerWidth; height = cornerSize;
-                break;
-            case 5:
-                x = CGRectGetWidth(frameView.bounds) - cornerSize;
-                y = CGRectGetHeight(frameView.bounds) - cornerWidth; width = cornerSize; height = cornerWidth;
-                break;
-            case 6:
-                x = 0; y = CGRectGetHeight(frameView.bounds) - cornerWidth; width = cornerSize; height = cornerWidth;
-                break;
-            case 7:
-                x = 0; y = CGRectGetHeight(frameView.bounds) - cornerSize; width = cornerWidth; height = cornerSize;
-                break;
-        }
-        UIView * cornerView = [[UIView alloc] initWithFrame:CGRectMake(x, y, width, height)];
-        cornerView.backgroundColor = self.frameColor;
-        [frameView addSubview:cornerView];
-    }
-}
-
-- (void)addVisualEffects:(CGRect)inputRect {
-    UIView *topView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.frame.size.width, inputRect.origin.y)];
-    topView.backgroundColor = [UIColor colorWithRed:0.0/255.0 green:0.0/255.0 blue:0.0/255.0 alpha:0.4];
-    [self addSubview:topView];
-
-    UIView *leftSideView = [[UIView alloc] initWithFrame:CGRectMake(0, inputRect.origin.y, self.frameOffset, self.frameHeight)]; //paddingForScanner scannerHeight
-    leftSideView.backgroundColor = [UIColor colorWithRed:0.0/255.0 green:0.0/255.0 blue:0.0/255.0 alpha:0.4];
-    [self addSubview:leftSideView];
-
-    UIView *rightSideView = [[UIView alloc] initWithFrame:CGRectMake(inputRect.size.width + self.frameOffset, inputRect.origin.y, self.frameOffset, self.frameHeight)];
-    rightSideView.backgroundColor = [UIColor colorWithRed:0.0/255.0 green:0.0/255.0 blue:0.0/255.0 alpha:0.4];
-    [self addSubview:rightSideView];
-
-    UIView *bottomView = [[UIView alloc] initWithFrame:CGRectMake(0, inputRect.origin.y + self.frameHeight, self.frame.size.width,
-                                                                  self.frame.size.height - inputRect.origin.y - self.frameHeight)];
-    bottomView.backgroundColor = [UIColor colorWithRed:0.0/255.0 green:0.0/255.0 blue:0.0/255.0 alpha:0.4];
-    [self addSubview:bottomView];
-}
-
-- (void)startAnimatingScanner:(UIView *)inputView {
-    if (!self.scannerView) {
-        self.scannerView = [[UIView alloc] initWithFrame:CGRectMake(2, 0, inputView.frame.size.width - 4, 2)];
-        self.scannerView.backgroundColor = self.laserColor;
-    }
-    if (self.scannerView.frame.origin.y != 0) {
-        [self.scannerView setFrame:CGRectMake(2, 0, inputView.frame.size.width - 4, 2)];
-    }
-    [inputView addSubview:self.scannerView];
-    [UIView animateWithDuration:3 delay:0 options:(UIViewAnimationOptionAutoreverse | UIViewAnimationOptionRepeat) animations:^{
-        CGFloat middleX = inputView.frame.size.width / 2;
-        self.scannerView.center = CGPointMake(middleX, inputView.frame.size.height - 1);
-    } completion:^(BOOL finished) {}];
-}
-
-- (void)stopAnimatingScanner {
-    [self.scannerView removeFromSuperview];
+    CGRect visibleRect = [self.previewLayer metadataOutputRectOfInterestForRect:self.scannerOverlay.dataReadingFrame.frame];
+    self.metadataOutput.rectOfInterest = visibleRect;
 }
 
 //Observer actions
 
 - (void)didEnterBackground:(NSNotification *)notification {
-    [self stopAnimatingScanner];
+    [self.scannerOverlay setShouldAnimating:NO];
 }
 
 - (void)willEnterForeground:(NSNotification *)notification {
-    [self startAnimatingScanner:self.dataReadingFrame];
+    [self.scannerOverlay setShouldAnimating:YES];
+    [self.scannerOverlay setNeedsLayout];
 }
+
+- (void)didChangeStatusBarOrientation:(NSNotification *)notification {
+    NSNumber * prevInterfaceOrientationNum = notification.userInfo[UIApplicationStatusBarOrientationUserInfoKey];
+    UIInterfaceOrientation prevInterfaceOrientationInt = prevInterfaceOrientationNum.integerValue;
+    UIInterfaceOrientation currentInterfaceOrientation = [UIApplication sharedApplication].statusBarOrientation;
+    NSLog(@"didChangeStatusBarOrientation %@ -> %@",NSStringFromInterfaceOrientation(prevInterfaceOrientationInt), NSStringFromInterfaceOrientation(currentInterfaceOrientation));
+    self.previewLayer.connection.videoOrientation = AVCaptureVideoOrientationFromInterfaceOrientation(currentInterfaceOrientation);
+}
+
 
 #pragma mark - observers
 
@@ -1007,6 +1109,10 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(willEnterForeground:)
                                                      name:UIApplicationWillEnterForegroundNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(didChangeStatusBarOrientation:)
+                                                     name:UIApplicationDidChangeStatusBarOrientationNotification
                                                    object:nil];
 
         self.isAddedOberver = YES;
@@ -1135,7 +1241,7 @@ didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects
             AVMetadataMachineReadableCodeObject *code = (AVMetadataMachineReadableCodeObject*)[self.previewLayer transformedMetadataObjectForMetadataObject:metadataObject];
             if (self.onReadCode && code.stringValue && ![code.stringValue isEqualToString:self.codeStringValue]) {
                 self.onReadCode(@{@"codeStringValue": code.stringValue});
-                [self stopAnimatingScanner];
+                [self.scannerOverlay setShouldAnimating:NO];
             }
         }
     }
@@ -1164,4 +1270,5 @@ const NSString *isNeedMultipleScanBarcode = @"isNeedMultipleScanBarcode";
 
 
 @end
+
 
