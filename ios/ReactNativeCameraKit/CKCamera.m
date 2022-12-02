@@ -209,7 +209,7 @@ RCT_ENUM_CONVERTER(CKCameraZoomMode, (@{
 #else
         self.previewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
         [self.layer addSublayer:self.previewLayer];
-        self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+        self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspect;
         [self setupCaptureSession];
 #endif
 
